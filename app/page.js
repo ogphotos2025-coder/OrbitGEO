@@ -99,7 +99,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 // MAIN APP logic
 // ============================================================ 
 export default function OrbitGEO() {
-  const [form, setForm] = useState({ url: "", brand: "", industry: "", competitor: "", city: "" });
+  const [form, setForm] = useState({ url: "", brand: "", industry: "", competitor: "", city: "", turboMode: false });
   const [stage, setStage] = useState("input"); // input | loading | results
   const [loadStep, setLoadStep] = useState(0);
   const [results, setResults] = useState(null);
@@ -519,6 +519,23 @@ export default function OrbitGEO() {
                 value={form.competitor}
                 onChange={e => setForm({ ...form, competitor: e.target.value })}
               />
+            </div>
+
+            <div className="geo-toggle-group">
+              <div className="geo-toggle-label">
+                <div className="geo-toggle-title">
+                  Turbo Mode <span className="geo-turbo-tag">Fast & Free</span>
+                </div>
+                <p className="geo-toggle-desc">Instant score via raw data. Skips AI narrative to avoid quota limits.</p>
+              </div>
+              <label className="geo-switch">
+                <input
+                  type="checkbox"
+                  checked={form.turboMode}
+                  onChange={e => setForm({ ...form, turboMode: e.target.checked })}
+                />
+                <span className="geo-slider"></span>
+              </label>
             </div>
           </div>
           {error && <p style={{ color: 'var(--red)', fontSize: '14px', marginBottom: '16px', fontWeight: 600 }}>{error}</p>}

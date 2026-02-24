@@ -136,7 +136,7 @@ async function runFirecrawlSearch(prompts, apiKey) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    let { url, brand, industry, competitor } = body;
+    let { url, brand, industry, competitor, turboMode } = body;
 
     if (!url || !brand || !industry) {
       return NextResponse.json({ error: 'URL, Brand Name, and Industry are required' }, { status: 400 });
@@ -229,7 +229,13 @@ export async function POST(request) {
     `;
 
     let finalResult;
+
     try {
+      // Jump to high-speed deterministic results if Turbo Mode is requested
+      if (turboMode) {
+        console.log(`[Audit] Turbo Mode active for ${brand} - Skipping AI Narrative.`);
+        throw new Error("TURBO_MODE_ACTIVE");
+      }
       console.log(`[Audit] Requesting Gemini analysis for ${brand} using gemini-1.5-flash-latest (temperature: 0)...`);
       const genAI = new GoogleGenerativeAI(googleGeminiApiKey);
       const model = genAI.getGenerativeModel({
@@ -263,20 +269,21 @@ export async function POST(request) {
       finalResult.citationHealth = technicalScore;
 
     } catch (e) {
-      console.warn(`[Audit] Gemini Analysis failed (Error: ${e.message}). Falling back to deterministic metrics.`);
-      // Robust fallback: Always provide a result if search data exists
+      const isTurbo = e.message === "TURBO_MODE_ACTIVE";
+      console.warn(`[Audit] ${isTurbo ? 'Turbo Mode' : 'AI Fallback'} active (Context: ${e.message})`);
+
       finalResult = {
-        geoScore: Math.round((visibilityPct * 0.5) + (technicalScore * 0.3) + (10)), // Low sentiment fallback
+        geoScore: Math.round((visibilityPct * 0.5) + (technicalScore * 0.3) + (10)),
         visibilityPct,
         citationHealth: technicalScore,
         sentimentScore: 50,
-        sentimentWords: [{ word: "Quota Limit", type: "neutral" }],
+        sentimentWords: [{ word: isTurbo ? "Fast Audit" : "Quota Limit", type: "neutral" }],
         promptResults: mentionDetails.map(m => ({ type: m.type, label: m.label, mentioned: m.mentioned, finding: m.finding })),
-        topFix: "Gemini API Limit reached. Retrying will provide deeper insights.",
+        topFix: isTurbo ? "Initialize standard audit for deep AI insights." : "Gemini API Limit reached. Insights restricted.",
         contentFix: "Ensure high-quality content for citation grounding.",
         jsonLd: `{"@context": "https://schema.org","@type": "Organization","name": "${brand}","url": "${url}"}`,
-        competitorInsight: "Competitive data partially available during high traffic.",
-        quickWins: ["Retry audit in 30s", "Optimize Schema"],
+        competitorInsight: isTurbo ? "Competitive intelligence requires Standard Mode." : "Competitive data partially restricted during fallback.",
+        quickWins: [isTurbo ? "Try Standard Mode" : "Retry in 30s", "Optimize Schema"],
         brandVsCompetitor: [
           { name: brand, visibility: visibilityPct },
           { name: competitor || 'Industry Avg', visibility: 45 }

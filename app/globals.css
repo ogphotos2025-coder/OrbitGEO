@@ -571,6 +571,7 @@ body {
   display: flex;
   justify-content: flex-end;
 }
+
 /* ---- INFORMATIVE DASHBOARD ENHANCEMENTS ---- */
 .geo-panel-footer {
   background: var(--slate-50);
@@ -609,4 +610,96 @@ body {
   background: var(--amber-dim);
   color: var(--amber);
   border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+/* ---- TOGGLE SWITCH ---- */
+.geo-toggle-group {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background: var(--slate-50);
+  border: 1px dashed var(--slate-200);
+  border-radius: 12px;
+  margin-top: 16px;
+}
+
+.geo-toggle-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.geo-toggle-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--slate-900);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.geo-toggle-desc {
+  font-size: 12px;
+  color: var(--slate-500);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.geo-switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+}
+
+.geo-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.geo-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--slate-200);
+  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 34px;
+}
+
+.geo-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+
+.geo-switch input:checked+.geo-slider {
+  background-color: var(--primary);
+}
+
+.geo-switch input:focus+.geo-slider {
+  box-shadow: 0 0 1px var(--primary);
+}
+
+.geo-switch input:checked+.geo-slider:before {
+  transform: translateX(24px);
+}
+
+.geo-turbo-tag {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
