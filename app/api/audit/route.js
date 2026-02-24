@@ -139,42 +139,36 @@ ${resultText}`;
     }).join('\n\n---\n\n');
 
     const analysisPrompt = `
-      Analyze the following GEO audit data for the brand "${brand}" in the "${industry}" industry.
+      ### SCORING RUBRIC (CRITICAL):
+      Calculate the "geoScore" based on these weights:
+      1. Visibility (50%): Ratio of positive mentions across prompts. (0 mentions = 0, 5/5 prompts = 100).
+      2. Sentiment (20%): Strength of brand alignment in snippets.
+      3. Technical (30%): Schema presence and missing crucial types.
 
-      Schema Data:
+      ### COMPARATIVE ANALYSIS:
+      If "${brand}" visibility is lower than "${competitor || 'competitors'}", the geoScore MUST reflect this gap proportionally. Use "Industry Avg" as the baseline.
+
+      ### SCHEMA ANALYSIS:
       - Found: ${schemaData.schemaFound}
       - Detected Types: ${(schemaData.schemaTypes || []).join(', ') || 'None'}
       - Missing Crucial Types: ${(schemaData.schemaMissing || []).join(', ') || 'None'}
 
-      Web Search Context (Real-time Results):
+      ### WEB SEARCH CONTEXT (REAL-TIME RESULTS):
       ${formattedResults}
 
-      INSTRUCTIONS:
-      Based ONLY on the context above, generate a highly detailed and critical JSON response.
-      The report must be professional, data-centric, and provide specific "Executive-level" insights.
-      If "${brand}" is not explicitly listed in search snippets, reflect this with low scores.
-      Compare "${brand}" against "${competitor || 'Category Leaders'}".
-      
+      ### JSON STRUCTURE:
       {
         "geoScore": 0-100,
         "visibilityPct": 0-100,
         "citationHealth": 0-100,
         "sentimentScore": 0-100,
-        "sentimentWords": [
-          {"word": "string", "type": "positive|neutral|negative"}
-        ],
-        "promptResults": [
-          {"type": "string", "label": "string", "mentioned": true/false, "finding": "critical summary of why the brand was or wasn't found"}
-        ],
-        "topFix": "Primary technical recommendation (e.g., Schema, entity grounding)",
-        "contentFix": "Primary content-led recommendation (e.g., semantic keyword targeting)",
-        "jsonLd": "A full, valid JSON-LD Organization/Product script for the brand",
-        "competitorInsight": "Deep strategic comparison. How is ${competitor || 'the competition'} outperforming ${brand}?",
-        "quickWins": [
-          "Specific, prioritized action item 1",
-          "Specific, prioritized action item 2",
-          "Specific, prioritized action item 3"
-        ],
+        "sentimentWords": [{"word": "string", "type": "positive|neutral|negative"}],
+        "promptResults": [{"type": "string", "label": "string", "mentioned": true/false, "finding": "summary"}],
+        "topFix": "Primary technical recommendation",
+        "contentFix": "Primary content-led recommendation",
+        "jsonLd": "Full, valid JSON-LD script",
+        "competitorInsight": "How is ${competitor || 'the competition'} outperforming ${brand}?",
+        "quickWins": ["Action 1", "Action 2", "Action 3"],
         "brandVsCompetitor": [
           {"name": "${brand}", "color": "#2563eb", "visibility": 0-100},
           {"name": "${competitor || 'Competitor A'}", "color": "#0891b2", "visibility": 0-100},
@@ -192,10 +186,12 @@ ${resultText}`;
       finalResult = null;
     } else {
       try {
-        console.log(`[Audit] Requesting Gemini analysis for ${brand} using gemini-2.5-flash...`);
+        console.log(`[Audit] Requesting Gemini analysis for ${brand} using gemini-2.5-flash (temperature: 0)...`);
         const genAI = new GoogleGenerativeAI(googleGeminiApiKey);
-        // Using "gemini-2.5-flash" as confirmed by testing
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.5-flash",
+          generationConfig: { temperature: 0 }
+        });
         const result = await model.generateContent(analysisPrompt);
         const response = await result.response;
         const text = response.text();
