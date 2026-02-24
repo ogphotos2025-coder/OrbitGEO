@@ -34,6 +34,8 @@ async function scrapeSchemaResilient(url, apiKey) {
     }
 
     const data = await response.json();
+    console.log(`[Audit] Firecrawl scrape response success: ${data.success}`);
+
     const markdown = data.data?.markdown || "";
     const schemaData = data.data?.json || {};
 
@@ -221,8 +223,8 @@ export async function POST(request) {
       }
     `;
 
-    let finalResult;
     try {
+      console.log(`[Audit] Requesting Gemini analysis for ${brand} using gemini-2.5-flash (temperature: 0)...`);
       const genAI = new GoogleGenerativeAI(googleGeminiApiKey);
       const model = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",
@@ -230,9 +232,19 @@ export async function POST(request) {
       });
       const result = await model.generateContent(analysisPrompt);
       const response = await result.response;
-      const text = response.text();
+
+      // Some SDK versions require await text(), and it's safer to check
+      const text = typeof response.text === 'function' ? await response.text() : response.text;
+
+      console.log(`[Audit] Gemini raw response length: ${text.length}`);
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      finalResult = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+      if (!jsonMatch) {
+        console.error("[Audit] No JSON found in prompt output:", text);
+        throw new Error("Invalid Gemini response format");
+      }
+
+      finalResult = JSON.parse(jsonMatch[0]);
+      console.log(`[Audit] Gemini analysis parsed successfully.`);
 
       // Override final geoScore to ensure code-level consistency
       const calcGeoScore = Math.round(
@@ -245,8 +257,29 @@ export async function POST(request) {
       finalResult.citationHealth = technicalScore;
 
     } catch (e) {
-      console.error("[Audit] Analysis crash:", e);
-      finalResult = null;
+      console.error("[Audit] Gemini Analysis Error:", e.message);
+      if (e.status === 429 || e.message?.includes("429")) {
+        console.warn("[Audit] Quota hit. Falling back to deterministic estimation based on metrics.");
+        finalResult = {
+          geoScore: Math.round((visibilityPct * 0.5) + (technicalScore * 0.3) + (10)), // Low sentiment fallback
+          visibilityPct,
+          citationHealth: technicalScore,
+          sentimentScore: 50,
+          sentimentWords: [{ word: "Quota Limit", type: "neutral" }],
+          promptResults: mentionDetails.map(m => ({ type: m.type, label: m.label, mentioned: m.mentioned, finding: m.finding })),
+          topFix: "Gemini API Limit reached. Retrying will provide deeper insights.",
+          contentFix: "Ensure high-quality content for citation grounding.",
+          jsonLd: `{"@context": "https://schema.org","@type": "Organization","name": "${brand}","url": "${url}"}`,
+          competitorInsight: "Competitive data partially available during high traffic.",
+          quickWins: ["Retry audit in 30s", "Optimize Schema"],
+          brandVsCompetitor: [
+            { name: brand, visibility: visibilityPct },
+            { name: competitor || 'Industry Avg', visibility: 45 }
+          ]
+        };
+      } else {
+        finalResult = null;
+      }
     }
 
     if (!finalResult) {
