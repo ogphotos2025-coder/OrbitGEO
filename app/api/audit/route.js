@@ -118,10 +118,14 @@ async function runFirecrawlSearch(prompts, apiKey) {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: p.prompt }),
       });
+      if (response.status === 402) throw new Error("Firecrawl API Credits Exhausted");
       if (!response.ok) return [];
       const data = await response.json();
       return data.data || data.web || data.results || [];
-    } catch (e) { return []; }
+    } catch (e) {
+      if (e.message.includes("Credits Exhausted")) throw e;
+      return [];
+    }
   });
   return await Promise.all(searchPromises);
 }
