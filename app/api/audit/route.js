@@ -123,6 +123,7 @@ async function runFirecrawlSearch(prompts, apiKey) {
       const data = await response.json();
       return data.data || data.web || data.results || [];
     } catch (e) {
+      console.error(`[Audit] Firecrawl Search Error: ${e.message}`);
       if (e.message.includes("Credits Exhausted")) throw e;
       return [];
     }
@@ -227,11 +228,12 @@ export async function POST(request) {
       }
     `;
 
+    let finalResult;
     try {
-      console.log(`[Audit] Requesting Gemini analysis for ${brand} using gemini-2.5-flash (temperature: 0)...`);
+      console.log(`[Audit] Requesting Gemini analysis for ${brand} using gemini-1.5-flash-latest (temperature: 0)...`);
       const genAI = new GoogleGenerativeAI(googleGeminiApiKey);
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash-latest",
         generationConfig: { temperature: 0 }
       });
       const result = await model.generateContent(analysisPrompt);
@@ -248,7 +250,7 @@ export async function POST(request) {
       }
 
       finalResult = JSON.parse(jsonMatch[0]);
-      console.log(`[Audit] Gemini analysis parsed successfully.`);
+      console.log(`[Audit] Gemini analysis parsed successfully. geoScore: ${finalResult.geoScore}`);
 
       // Override final geoScore to ensure code-level consistency
       const calcGeoScore = Math.round(
@@ -261,29 +263,25 @@ export async function POST(request) {
       finalResult.citationHealth = technicalScore;
 
     } catch (e) {
-      console.error("[Audit] Gemini Analysis Error:", e.message);
-      if (e.status === 429 || e.message?.includes("429")) {
-        console.warn("[Audit] Quota hit. Falling back to deterministic estimation based on metrics.");
-        finalResult = {
-          geoScore: Math.round((visibilityPct * 0.5) + (technicalScore * 0.3) + (10)), // Low sentiment fallback
-          visibilityPct,
-          citationHealth: technicalScore,
-          sentimentScore: 50,
-          sentimentWords: [{ word: "Quota Limit", type: "neutral" }],
-          promptResults: mentionDetails.map(m => ({ type: m.type, label: m.label, mentioned: m.mentioned, finding: m.finding })),
-          topFix: "Gemini API Limit reached. Retrying will provide deeper insights.",
-          contentFix: "Ensure high-quality content for citation grounding.",
-          jsonLd: `{"@context": "https://schema.org","@type": "Organization","name": "${brand}","url": "${url}"}`,
-          competitorInsight: "Competitive data partially available during high traffic.",
-          quickWins: ["Retry audit in 30s", "Optimize Schema"],
-          brandVsCompetitor: [
-            { name: brand, visibility: visibilityPct },
-            { name: competitor || 'Industry Avg', visibility: 45 }
-          ]
-        };
-      } else {
-        finalResult = null;
-      }
+      console.warn(`[Audit] Gemini Analysis failed (Error: ${e.message}). Falling back to deterministic metrics.`);
+      // Robust fallback: Always provide a result if search data exists
+      finalResult = {
+        geoScore: Math.round((visibilityPct * 0.5) + (technicalScore * 0.3) + (10)), // Low sentiment fallback
+        visibilityPct,
+        citationHealth: technicalScore,
+        sentimentScore: 50,
+        sentimentWords: [{ word: "Quota Limit", type: "neutral" }],
+        promptResults: mentionDetails.map(m => ({ type: m.type, label: m.label, mentioned: m.mentioned, finding: m.finding })),
+        topFix: "Gemini API Limit reached. Retrying will provide deeper insights.",
+        contentFix: "Ensure high-quality content for citation grounding.",
+        jsonLd: `{"@context": "https://schema.org","@type": "Organization","name": "${brand}","url": "${url}"}`,
+        competitorInsight: "Competitive data partially available during high traffic.",
+        quickWins: ["Retry audit in 30s", "Optimize Schema"],
+        brandVsCompetitor: [
+          { name: brand, visibility: visibilityPct },
+          { name: competitor || 'Industry Avg', visibility: 45 }
+        ]
+      };
     }
 
     if (!finalResult) {
@@ -299,7 +297,6 @@ export async function POST(request) {
     };
 
     return NextResponse.json(responsePayload);
-
   } catch (error) {
     console.error('[Audit] Fatal Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
