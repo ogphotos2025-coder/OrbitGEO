@@ -161,11 +161,39 @@ export default function OrbitGEO() {
   const handleDownloadPdf = async () => {
     const input = document.getElementById('geo-results-container');
     if (!input) return;
-    const canvas = await html2canvas(input, { scale: 2, backgroundColor: "#ffffff" });
+
+    // Capture the entire element
+    const canvas = await html2canvas(input, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff"
+    });
+
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
+
     const pdfWidth = pdf.internal.pageSize.getWidth();
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, (canvas.height * pdfWidth) / canvas.width);
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentWidth = pdfWidth - (margin * 2);
+    const contentHeight = (canvas.height * contentWidth) / canvas.width;
+
+    let heightLeft = contentHeight;
+    let position = margin;
+
+    // Add first page
+    pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
+    heightLeft -= (pdfHeight - (margin * 2));
+
+    // add subsequent pages
+    while (heightLeft > 0) {
+      position = heightLeft - contentHeight + margin;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
+      heightLeft -= pdfHeight;
+    }
+
     pdf.save(`OrbitGEO-Audit-${form.brand}.pdf`);
   };
 
